@@ -1,0 +1,257 @@
+Pract. 1 : Arduino / Raspberry PI
+
+Code:
+
+import RPi.GPIO as GPIO
+import time
+
+
+GPIO.setwarnings(False)
+TRIG = 11
+ECHO = 8
+servoPIN = 18
+GPIO.setmode(GPIO.BCM)
+
+
+GPIO.setup(TRIG, GPIO.OUT)
+GPIO.setup(ECHO, GPIO.IN)  
+
+
+GPIO.setup(servoPIN, GPIO.OUT)
+servo = GPIO.PWM(servoPIN, 50)
+servo.start(2.5)
+
+try:
+    while True:
+        
+        GPIO.output(TRIG, False)
+        time.sleep(0.000002)
+        GPIO.output(TRIG, True)
+        time.sleep(0.00001)
+        GPIO.output(TRIG, False)
+
+        # Measure the duration of the echo pulse
+        startTime = time.time()
+        stopTime = time.time()
+
+        while GPIO.input(ECHO) == 0:
+            startTime = time.time()
+
+        while GPIO.input(ECHO) == 1:
+            stopTime = time.time()
+
+        # Calculate distance
+        timeElapsed = stopTime - startTime
+        distance = (timeElapsed * 34300) / 2
+        distance = int(distance)
+        print("Distance: {} cm".format(distance))
+
+        # Control the servo motor based on distance
+        if distance <= 20:
+            duty_cycle = 12.5  # Adjust this value for desired servo position
+            servo.ChangeDutyCycle(duty_cycle)
+            print("Motor Rotated")
+            time.sleep(0.1)
+        else:
+            duty_cycle = 2.5  # Adjust this value for desired servo position
+            servo.ChangeDutyCycle(duty_cycle)
+            print("Motor is at original position")
+            time.sleep(0.1)
+
+except KeyboardInterrupt:
+    # Cleanup GPIO settings
+    servo.stop()
+    GPIO.cleanup()
+
+
+-----------------------------------------------------------------------------------------------------------------
+
+Practical 2: Monitoring IOT System
+
+code: 
+
+#include <stdlib.h>
+#include <DHT.h>
+
+#define DHTPIN 5           // DHT data pin connected to Arduino pin 5
+#define DHTTYPE DHT11      // Define the DHT sensor type as DHT11
+DHT dht(DHTPIN, DHTTYPE);  // Initialize the DHT sensor
+
+#define SSID "WiFi Name"   // Your WiFi network name
+#define PASS "WiFi Password" // Your WiFi network password
+#define IP "184.106.153.149" // IP address of ThingSpeak
+
+String msg = "GET /update?key=Your API Key"; // Replace with your ThingSpeak API key
+float temp;
+int hum;
+String tempC;
+int error;
+
+void setup() {
+    Serial.begin(115200);  // Set the baud rate for serial communication
+    Serial.println("AT");
+    delay(5000);
+
+    // Check if the ESP8266 responds with "OK"
+    if (Serial.find("OK")) {
+        connectWiFi();  // Attempt to connect to the WiFi network
+    }
+}
+
+void loop() {
+start:
+    error = 0;
+
+    // Read temperature and humidity from the DHT11 sensor
+    temp = dht.readTemperature();
+    hum = dht.readHumidity();
+
+    // Convert the temperature to a string
+    char buffer[10];
+    tempC = dtostrf(temp, 4, 1, buffer);
+
+    // Send the data to ThingSpeak
+    updateTemp();
+
+    // If there was an error, retry
+    if (error == 1) {
+        goto start;
+    }
+
+    delay(5000); // Wait for 5 seconds before sending the next reading
+}
+
+void updateTemp() {
+    // Create the AT command to establish a TCP connection to ThingSpeak
+    String cmd = "AT+CIPSTART=\"TCP\",\"";
+    cmd += IP;
+    cmd += "\",80";
+    Serial.println(cmd);
+    delay(2000);
+
+    // Check for connection error
+    if (Serial.find("Error")) {
+        return;
+    }
+
+    // Construct the HTTP GET request
+    cmd = msg;
+    cmd += "&field1=";
+    cmd += tempC;
+    cmd += "&field2=";
+    cmd += String(hum);
+    cmd += "\r\n";
+
+    // Send the length of the HTTP GET request
+    Serial.print("AT+CIPSEND=");
+    Serial.println(cmd.length());
+
+    // Check if the ESP8266 is ready to send data
+    if (Serial.find(">")) {
+        Serial.print(cmd);  // Send the HTTP GET request
+    } else {
+        Serial.println("AT+CIPCLOSE"); // Close the connection if there is an issue
+        error = 1; // Set error flag to retry the request
+    }
+}
+
+boolean connectWiFi() {
+    // Set the ESP8266 WiFi mode to Station (client mode)
+    Serial.println("AT+CWMODE=1");
+    delay(2000);
+
+    // Construct the AT command to join the WiFi network
+    String cmd = "AT+CWJAP=\"";
+    cmd += SSID;
+    cmd += "\",\"";
+    cmd += PASS;
+    cmd += "\"";
+    Serial.println(cmd);
+    delay(5000);
+
+    // Check if the connection is successful
+    if (Serial.find("OK")) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+
+--------------------------------------------------------------------------------------------------
+
+
+
+Practical 3: Real time monitoring Android App
+
+Code:
+
+import RPi.GPIO as GPIO
+import time
+
+# GPIO Setup
+channel = 4  # Define the GPIO pin where the sensor is connected
+
+# Set the GPIO mode to BCM (Broadcom SOC channel numbering)
+GPIO.setmode(GPIO.BCM)
+# Set the sensor pin as input
+GPIO.setup(channel, GPIO.IN)
+
+# Callback function to handle water detection
+def callback(channel):
+    if GPIO.input(channel):
+        print("Water detected!")
+    else:
+        print("Water not detected!")
+
+# Set up event detection for changes in the input signal
+GPIO.add_event_detect(channel, GPIO.BOTH, bouncetime=300)
+# Assign the callback function to be called when an event is detected
+GPIO.add_event_callback(channel, callback)
+
+# Infinite loop to keep the program running
+try:
+    while True:
+        time.sleep(0.1)  # Sleep to reduce CPU usage
+
+except KeyboardInterrupt:
+    print("\nProgram interrupted. Cleaning up GPIO...")
+    GPIO.cleanup()  # Reset GPIO settings
+
+
+----------------------------------------------------------------------------------
+
+
+Practical 4: LED
+
+Code:
+
+from gpiozero import LED
+import time
+
+# Initialize LEDs connected to GPIO pins
+R = LED(16)  # Red LED connected to GPIO pin 16
+Y = LED(18)  # Yellow LED connected to GPIO pin 18
+G = LED(17)  # Green LED connected to GPIO pin 17
+
+# Infinite loop to control the LEDs
+while True:
+    # Turn on the Red LED
+    R.on()
+    time.sleep(3)  # Wait for 3 seconds
+    R.off()        # Turn off the Red LED
+
+    # Turn on the Yellow LED
+    Y.on()
+    time.sleep(2)  # Wait for 2 seconds
+    Y.off()        # Turn off the Yellow LED
+
+    # Turn on the Green LED
+    G.on()
+    time.sleep(3)  # Wait for 3 seconds
+    G.off()        # Turn off the Green LED
+
+
+
+
